@@ -45,6 +45,9 @@ update_certs() {
     unset LETSENCRYPT_CONTAINERS
     source "$DIR"/letsencrypt_service_data
 
+    # Domain hash
+    declare -A domain_hash
+
     reload_nginx='false'
     for cid in "${LETSENCRYPT_CONTAINERS[@]}"; do
         # Derive host and email variable names
@@ -59,12 +62,25 @@ update_certs() {
             create_test_certificate=true
         fi
 
-        params_d_str=""
-        [[ $DEBUG == true ]] && params_d_str+=" -v"
-
         hosts_array_expanded=("${!hosts_array}")
         # First domain will be our base domain
         base_domain="${hosts_array_expanded[0]}"
+
+        if [ ${domain_hash["$base_domain"]+_} ]; then
+            # found
+            domain_hash[$base_domain]="${domain_hash[$base_domain]} ${hosts_array_expanded[@]:1}"
+        else
+            # not found
+            domain_hash[$base_domain]="${hosts_array_expanded[@]}"
+        fi
+    done
+
+    for base_domain in "${!domain_hash[@]}"; do
+        hosts_array_expanded=(${domain_hash[$base_domain]})
+        hosts_array="hosts_array_expanded[@]"
+
+        params_d_str=""
+        [[ $DEBUG == true ]] && params_d_str+=" -v"
 
         if [[ "$create_test_certificate" == true ]]; then
             # Use staging acme end point
